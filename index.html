@@ -1,43 +1,35 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Free Fire Mobile - Pro</title>
+    <title>FF Survival Pro</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.9.0/nipplejs.min.js"></script>
-
     <style>
-        body { margin: 0; overflow: hidden; touch-action: none; background: #000; font-family: sans-serif; }
-        #lobby { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d); display: flex; justify-content: center; align-items: center; z-index: 1000; text-align: center; }
-        #start-btn { padding: 20px 60px; font-size: 26px; background: #ff4500; color: white; border: none; border-radius: 50px; box-shadow: 0 6px #900; font-weight: bold; cursor: pointer; }
-        
-        /* Giao diện trong game */
-        #ui-layer { display: none; }
-        .btn { position: absolute; border-radius: 50%; border: 2px solid #fff; color: white; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); font-weight: bold; z-index: 10; }
-        #shoot-btn { bottom: 40px; right: 30px; width: 90px; height: 90px; background: rgba(255,0,0,0.6); }
-        #joystick-container { position: absolute; bottom: 40px; left: 40px; width: 120px; height: 120px; z-index: 10; }
-        #hp-bar { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); width: 200px; height: 12px; background: rgba(0,0,0,0.5); border: 2px solid #fff; border-radius: 10px; }
-        #hp-fill { width: 100%; height: 100%; background: #00ff00; border-radius: 8px; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: Arial; }
+        #lobby { position: fixed; inset: 0; background: linear-gradient(to bottom, #1a2a6c, #b21f1f); display: flex; justify-content: center; align-items: center; z-index: 100; color: white; text-align: center; }
+        #start-btn { padding: 18px 50px; font-size: 24px; background: #ff4500; color: #fff; border: none; border-radius: 40px; font-weight: bold; box-shadow: 0 6px #900; }
+        #ui { display: none; }
+        .btn { position: absolute; border-radius: 50%; background: rgba(0,0,0,0.5); border: 2px solid #fff; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; z-index: 10; }
+        #shoot-btn { bottom: 50px; right: 30px; width: 90px; height: 90px; background: rgba(255,0,0,0.6); }
+        #jump-btn { bottom: 150px; right: 40px; width: 60px; height: 60px; }
+        #joy { position: absolute; bottom: 50px; left: 50px; width: 120px; height: 120px; z-index: 10; }
+        #hp { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); width: 200px; height: 15px; background: #333; border: 2px solid #fff; border-radius: 10px; }
+        #hp-bar { width: 100%; height: 100%; background: #0f0; transition: 0.3s; }
     </style>
 </head>
 <body>
-
     <div id="lobby">
-        <div>
-            <h1 style="color: #ffcc00; font-size: 42px; text-shadow: 3px 3px #000;">FREE FIRE MOBILE</h1>
-            <button id="start-btn">BẮT ĐẦU</button>
-        </div>
+        <div><h1 style="font-size: 45px; text-shadow: 3px 3px #000;">BOOYAH!</h1><button id="start-btn">VÀO TRẬN</button></div>
     </div>
-
-    <div id="ui-layer">
-        <div id="hp-bar"><div id="hp-fill"></div></div>
+    <div id="ui">
+        <div id="hp"><div id="hp-bar"></div></div>
         <div id="shoot-btn" class="btn">BẮN</div>
-        <div id="joystick-container"></div>
+        <div id="jump-btn" class="btn">NHẢY</div>
+        <div id="joy"></div>
     </div>
-
     <script>
-        // --- 1. THIẾT LẬP THẾ GIỚI ---
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x87ceeb);
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
@@ -46,24 +38,23 @@
         document.body.appendChild(renderer.domElement);
 
         scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-        const ground = new THREE.Mesh(new THREE.PlaneGeometry(500, 500), new THREE.MeshPhongMaterial({color: 0x2d5a27}));
+        const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshPhongMaterial({color: 0x2d5a27}));
         ground.rotation.x = -Math.PI/2;
         scene.add(ground);
 
-        // --- 2. NHÂN VẬT ---
         const player = new THREE.Group();
-        player.add(new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1, 4), new THREE.MeshPhongMaterial({color: 0x00ff00})));
-        player.position.y = 1;
+        const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1, 4), new THREE.MeshPhongMaterial({color: 0x00ff00}));
+        body.position.y = 1;
+        player.add(body);
         scene.add(player);
 
-        // --- 3. ĐIỀU KHIỂN ---
-        let move = {x: 0, y: 0}, camY = 0;
+        let move = {x:0, y:0}, camY = 0, vY = 0, isGrounded = true;
         document.getElementById('start-btn').onclick = () => {
             document.getElementById('lobby').style.display = 'none';
-            document.getElementById('ui-layer').style.display = 'block';
+            document.getElementById('ui').style.display = 'block';
         };
 
-        const joy = nipplejs.create({zone: document.getElementById('joystick-container'), mode: 'static', position: {left: '60px', bottom: '60px'}});
+        const joy = nipplejs.create({zone: document.getElementById('joy'), mode: 'static', position: {left: '60px', bottom: '60px'}});
         joy.on('move', (e, d) => { move = {x: d.vector.x, y: d.vector.y}; });
         joy.on('end', () => { move = {x: 0, y: 0}; });
 
@@ -71,17 +62,21 @@
             if(e.touches[0].clientX > window.innerWidth/2) camY -= e.touches[0].deltaX * 0.005 || 0;
         });
 
-        // --- 4. VÒNG LẶP RENDER ---
+        document.getElementById('jump-btn').onclick = () => { if(isGrounded) vY = 0.15; };
+
         function animate() {
             requestAnimationFrame(animate);
             player.rotation.y = camY;
-            player.translateX(move.x * 0.1);
-            player.translateZ(-move.y * 0.1);
+            player.translateX(move.x * 0.12);
+            player.translateZ(-move.y * 0.12);
+            
+            player.position.y += vY;
+            if(player.position.y > 0) { vY -= 0.008; isGrounded = false; }
+            else { player.position.y = 0; vY = 0; isGrounded = true; }
 
             const offset = new THREE.Vector3(0, 2.5, 5).applyQuaternion(player.quaternion);
             camera.position.copy(player.position).add(offset);
             camera.lookAt(player.position.x, player.position.y + 1, player.position.z);
-
             renderer.render(scene, camera);
         }
         animate();
